@@ -1,51 +1,89 @@
-import * as THREE from 'three'
-import { useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { useGLTF, useTexture, OrbitControls, PivotControls, AccumulativeShadows, RandomizedLight, Decal } from '@react-three/drei'
-import { useControls } from 'leva'
+// App.jsx
+// Root of the application.
+// - Wraps everything in DecalBoxesProvider (the shared data store)
+// - Renders the Leva UI panel and the Three.js Canvas
 
-export const App = () => (
-  <Canvas shadows orthographic camera={{ position: [0, 10, 100], zoom: 140 }}>
-    <ambientLight intensity={0.5 * Math.PI} />
-    <directionalLight intensity={0.5} position={[10, 10, 10]} />
-    <Cup scale={2} position={[0, -1, 0]} />
-    <AccumulativeShadows temporal frames={100} alphaTest={0.95} opacity={1} scale={25} position={[0, -1, 0]}>
-      <RandomizedLight amount={8} radius={10} ambient={0.7} position={[10, 10, -5]} bias={0.01} size={10} />
-    </AccumulativeShadows>
-    <OrbitControls makeDefault />
-  </Canvas>
-)
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, Environment } from "@react-three/drei";
+import { useControls, button, Leva } from "leva";
+import { useState, useCallback, useContext } from "react";
+import { DecalBoxesProvider, DecalBoxesContext } from "./context/DecalBoxesContext";
+import { Scene } from "./components/Scene";
 
-function Cup(props) {
-  const [pos, setXYZ] = useState([0, 0.75, 0.3])
-  const [rot, setRot] = useState([0, 0, 0])
-  const [scl, setScl] = useState([0.6, 0.6, 0.6])
-  const { nodes, materials } = useGLTF('/coffee-transformed.glb')
-  const { debug, image } = useControls({
-    debug: false,
-    image: { image: '/1200px-Starbucks_Logo_ab_2011.svg.png' }
-  })
+// -------------------------------------------------------------------
+// Inner component – safely calls useContext because it lives inside Provider
+// -------------------------------------------------------------------
+function AppInner() {
+  const { addBox, removeBox, updateBox } = useContext(DecalBoxesContext);
+
+  // Track which box is currently selected (null = none)
+  const [selectedId, setSelectedId] = useState(null);
+
+  // Delete the selected box and clear selection
+  const deleteSelected = useCallback(() => {
+    if (selectedId === null) return;
+    removeBox(selectedId);
+    setSelectedId(null);
+  }, [selectedId, removeBox]);
+
+  // Open the OS file picker and replace the selected box's image
+  const uploadImageForSelected = useCallback(() => {
+    if (selectedId === null) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      // Create a temporary browser-local URL for the chosen image file
+      const url = URL.createObjectURL(file);
+      updateBox(selectedId, { imageUrl: url });
+    };
+    input.click();
+  }, [selectedId, updateBox]);
+
+  // -------------------------------------------------------------------
+  // LEVA UI PANEL
+  // useControls rebuilds the panel every time selectedId changes.
+  // Spreading conditional keys makes Delete and Upload appear/disappear.
+  // -------------------------------------------------------------------
+  useControls(
+    {
+      "New decal": button(() => addBox()),
+      ...(selectedId !== null && {
+        Delete: button(() => deleteSelected()),
+        "Upload an image": button(() => uploadImageForSelected()),
+      }),
+    },
+    [selectedId, deleteSelected, uploadImageForSelected]
+  );
+
   return (
-    <>
-      <mesh castShadow geometry={nodes.coffee_cup_top_16oz.geometry} material={materials['13 - Default']} {...props} material-aoMapIntensity={1} dispose={null}>
-        <group position={[0, 0.75, 0.5]}>
-          <PivotControls
-            scale={0.55}
-            activeAxes={[true, true, true]}
-            onDrag={(local) => {
-              const position = new THREE.Vector3()
-              const scale = new THREE.Vector3()
-              const quaternion = new THREE.Quaternion()
-              local.decompose(position, quaternion, scale)
-              const rotation = new THREE.Euler().setFromQuaternion(quaternion)
-              setXYZ([position.x, position.y + 0.75, position.z + 0.3])
-              setRot([rotation.x, rotation.y, rotation.z])
-              setScl([0.6 * scale.x, 0.6 * scale.y, 0.6 * scale.z])
-            }}
-          />
-        </group>
-        <Decal debug={debug} position={pos} rotation={rot} scale={scl} map={useTexture(image)} material-depthTest={true} />
-      </mesh>
-    </>
-  )
+    <div style={{ width: "100vw", height: "100vh", background: "#111827" }}>
+      {/* Leva floats itself as an overlay in the top-right corner */}
+      <Leva collapsed={false} theme={{ sizes: { rootWidth: "280px" } }} />
+
+      <Canvas
+        shadows
+        camera={{ position: [0, 1.5, 4], fov: 45 }}
+        // Clicking the canvas background deselects the current box
+        onPointerMissed={() => setSelectedId(null)}
+        style={{ width: "100%", height: "100%" }}
+      >
+        <Scene selectedId={selectedId} onSelect={setSelectedId} />
+        <OrbitControls makeDefault />
+        <Environment preset="city" />
+      </Canvas>
+    </div>
+  );
+}
+
+// The default export wraps AppInner with the Provider
+// so that useContext works everywhere inside the tree
+export default function App() {
+  return (
+    <DecalBoxesProvider>
+      <AppInner />
+    </DecalBoxesProvider>
+  );
 }
