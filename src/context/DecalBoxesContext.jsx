@@ -17,9 +17,21 @@ export function DecalBoxesProvider({ children }) {
       imageUrl: "./1200px-Starbucks_Logo_ab_2011.svg.png",
       position: [0, 0, 0],
       rotation: [0, 0, 0],
-      scale:    [1, 1, 1],
+      scale:    [0.25, 0.25, 0.25],
     },
   ]);
+
+  // projectorVisible: controls whether ALL wireframe box projectors are
+  // rendered in the scene. true = visible (default), false = hidden.
+  // The decals themselves are always projected regardless of this flag –
+  // hiding the boxes is purely a visual aid so the user can preview the
+  // final result without the wireframe boxes cluttering the view.
+  const [projectorVisible, setProjectorVisible] = useState(true);
+
+  // toggleProjectorVisibility: flip visible ↔ hidden for all boxes at once
+  const toggleProjectorVisibility = useCallback(() => {
+    setProjectorVisible((prev) => !prev);
+  }, []);
 
   // updateBox: merge new transform (or image) data into one box by id
   const updateBox = useCallback((id, patch) => {
@@ -48,7 +60,16 @@ export function DecalBoxesProvider({ children }) {
   }, []);
 
   return (
-    <DecalBoxesContext.Provider value={{ decalBoxes, updateBox, addBox, removeBox }}>
+    <DecalBoxesContext.Provider
+      value={{
+        decalBoxes,
+        updateBox,
+        addBox,
+        removeBox,
+        projectorVisible,
+        toggleProjectorVisibility,
+      }}
+    >
       {children}
     </DecalBoxesContext.Provider>
   );

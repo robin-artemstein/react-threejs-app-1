@@ -61,7 +61,7 @@ function DecalStamp({ box }) {
       // Euler rotation of the projector box
       rotation={box.rotation ?? [0, 0, 0]}
       // Scale matches the box size so the image covers exactly one face
-      scale={box.scale ?? [10, 10, 10]}
+      scale={box.scale ?? [0, 0, 0]}
       // The actual image texture to stamp
       map={texture}
       // polygonOffset prevents z-fighting (decal flickering through mesh surface)
